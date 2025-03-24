@@ -8,7 +8,7 @@ from io import BytesIO
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import datetime
 
-st.title("Uganda Road Project Management Dashboard")
+st.title("Armpass Project Cost Manager Dashboard")
 
 # Create navigation tabs (7 tabs now)
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
