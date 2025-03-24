@@ -8,7 +8,7 @@ from io import BytesIO
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import datetime
 
-st.title("Armpass Project Cost Manager Dashboard")
+st.title("Armpass Project Cost Manager ")
 
 # Create navigation tabs (7 tabs now)
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
@@ -250,7 +250,7 @@ else:
     st.warning("Please upload both Budgeted and Actual Cost files to proceed.")
 
 # Feedback Section
-st.markdown("## Feedback")
-feedback = st.text_area("Please enter your feedback:")
+st.markdown("## We Would Like to Hear From You")
+feedback = st.text_area("Any feedback?:")
 if st.button("Submit Feedback"):
-    st.success("Thank you for your feedback!")
+    st.success("An values Feedback!")
