@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -83,14 +83,17 @@ with tab1:
             if description.strip() == "":
                 st.warning("Please enter a valid description.")
             else:
+                # Create new row as DataFrame
                 new_row_df = pd.DataFrame([{
                     "Date": expense_date,
                     "Description": description,
                     "Amount": amount,
                     "Category": category
                 }])
+                # Reset indexes on both existing data and new row to ensure unique indexing
+                new_row_df.reset_index(drop=True, inplace=True)
                 st.session_state["expenses_data"] = pd.concat(
-                    [st.session_state["expenses_data"], new_row_df],
+                    [st.session_state["expenses_data"].reset_index(drop=True), new_row_df],
                     ignore_index=True
                 )
                 st.success("Expense added successfully!")
@@ -188,7 +191,7 @@ if budget_df is not None and actual_df is not None:
                 st.warning("No data available.")
 
         ###################################
-        # TAB 4: SPI (Schedule) ...
+        # TAB 4: SPI (Schedule)
         ###################################
         with tab4:
             st.subheader("Schedule Performance Index (SPI)")
@@ -196,30 +199,33 @@ if budget_df is not None and actual_df is not None:
                 schedule_df["SPI"] = schedule_df["Planned Duration"] / schedule_df["Actual Duration"]
                 fig, ax = plt.subplots()
                 ax.bar(schedule_df["Task"], schedule_df["SPI"], color="orange")
+                # Set explicit tick positions and labels to avoid warnings
+                ax.set_xticks(range(len(schedule_df["Task"])))
+                ax.set_xticklabels(schedule_df["Task"], rotation=45, ha="right")
                 ax.axhline(1, color="red", linestyle="--", label="Baseline SPI = 1")
                 ax.set_ylabel("SPI")
-                ax.set_xticklabels(schedule_df["Task"], rotation=45, ha="right")
                 ax.legend()
                 st.pyplot(fig)
             else:
                 st.warning("Please upload a valid schedule file.")
 
         ###################################
-        # TAB 5: Risk Impact ...
+        # TAB 5: Risk Impact
         ###################################
         with tab5:
             st.subheader("Risk Impact Analysis")
             if risk_df is not None and {"Risk Factor", "Variance"}.issubset(risk_df.columns):
                 fig, ax = plt.subplots()
                 ax.bar(risk_df["Risk Factor"], risk_df["Variance"], color="green")
-                ax.set_ylabel("Variance (UGX)")
+                ax.set_xticks(range(len(risk_df["Risk Factor"])))
                 ax.set_xticklabels(risk_df["Risk Factor"], rotation=45, ha="right")
+                ax.set_ylabel("Variance (UGX)")
                 st.pyplot(fig)
             else:
                 st.warning("Please upload a valid risk analysis file.")
 
         ###################################
-        # TAB 6: Trend Analysis ...
+        # TAB 6: Trend Analysis
         ###################################
         with tab6:
             st.subheader("Quarterly Trend Analysis & Forecast")
@@ -277,7 +283,7 @@ if budget_df is not None and actual_df is not None:
                 st.warning("No 'Date' column found in actual data.")
 
         ###################################
-        # TAB 7: Reports ...
+        # TAB 7: Reports
         ###################################
         with tab7:
             st.subheader("Generate Reports")
@@ -327,7 +333,7 @@ if budget_df is not None and actual_df is not None:
             )
 
         ###################################
-        # TAB 8: Scenario Analysis ...
+        # TAB 8: Scenario Analysis
         ###################################
         with tab8:
             st.subheader("Scenario Analysis")
