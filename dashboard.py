@@ -8,12 +8,14 @@ from io import BytesIO
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import datetime
 
-st.title("Uganda Road Project Management Dashboard")
+# Update the dashboard title
+st.title("Armpass Project Cost Manager")
 
-# Create navigation tabs (7 tabs in total)
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+# Create navigation tabs (8 tabs in total)
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📊 Cost Analysis", "📉 CPI Graph", "📈 SPI",
-    "⚠️ Risk Impact", "📅 Trend Analysis", "📂 Reports", "🧩 Scenario Analysis"
+    "⚠️ Risk Impact", "📅 Trend Analysis", "📂 Reports", "🧩 Scenario Analysis",
+    "📝 Expense Entry"
 ])
 
 # Sidebar for file uploads
@@ -27,13 +29,29 @@ risk_file = st.sidebar.file_uploader("Upload Risk Analysis File (Excel)", type=[
 def read_excel(file):
     return pd.read_excel(file) if file else None
 
-# Read data files
+# Read budget, schedule, and risk data (for now, Actual Cost may come from file or our Expense Entry tab)
 budget_df = read_excel(budget_file)
-actual_df = read_excel(actual_file)
 schedule_df = read_excel(schedule_file)
 risk_df = read_excel(risk_file)
 
-# Enhanced multiselect function with "Select All" support
+# ================================
+# 1. Actual Cost Data: either uploaded or entered
+# ================================
+if "expenses_data" not in st.session_state:
+    st.session_state["expenses_data"] = pd.DataFrame(
+        columns=["Date", "Description", "Amount", "Category"]
+    )
+
+if actual_file is not None:
+    actual_df = read_excel(actual_file)
+    actual_df.columns = actual_df.columns.str.strip()
+else:
+    if not st.session_state["expenses_data"].empty:
+        actual_df = st.session_state["expenses_data"]
+    else:
+        actual_df = None
+
+# Enhanced multiselect function with "Select All"
 def multiselect_with_select_all(label, options, default=None):
     full_options = ["Select All"] + options
     if default is None:
@@ -45,14 +63,13 @@ def multiselect_with_select_all(label, options, default=None):
         return options
     return selected_options
 
-# Proceed only if Budget and Actual cost files are uploaded
+# ==============================================
+# Proceed only if Budget file and either Actual data exists
+# ==============================================
 if budget_df is not None and actual_df is not None:
-    # Standardize column names
     budget_df.columns = budget_df.columns.str.strip()
-    actual_df.columns = actual_df.columns.str.strip()
-
+    
     if "Cost Category" in budget_df.columns and "Cost Category" in actual_df.columns:
-        # Merge budget and actual data with an outer merge
         merged_df = pd.merge(
             budget_df,
             actual_df,
@@ -106,11 +123,13 @@ if budget_df is not None and actual_df is not None:
         # TAB 1: Detailed Cost Comparison
         with tab1:
             st.subheader("Detailed Cost Comparison")
+            st.markdown("This tab displays a side-by-side comparison of budgeted versus actual costs by category.")
             st.dataframe(filtered_df)
 
         # TAB 2: Interactive CPI Graph using Plotly
         with tab2:
             st.subheader("Cost Performance Index (CPI) Graph")
+            st.markdown("View the CPI for each cost category with an interactive bar chart. The red line represents the baseline CPI of 1.")
             if not filtered_df.empty:
                 fig = px.bar(filtered_df, x="Cost Category", y="CPI",
                              labels={"CPI": "CPI", "Cost Category": "Cost Category"},
@@ -123,6 +142,7 @@ if budget_df is not None and actual_df is not None:
         # TAB 3: Schedule Performance Index (SPI) using Matplotlib
         with tab3:
             st.subheader("Schedule Performance Index (SPI)")
+            st.markdown("This tab displays the SPI calculated from planned versus actual durations of project tasks.")
             if schedule_df is not None and {"Task", "Planned Duration", "Actual Duration"}.issubset(schedule_df.columns):
                 schedule_df["SPI"] = schedule_df["Planned Duration"] / schedule_df["Actual Duration"]
                 fig, ax = plt.subplots()
@@ -138,6 +158,7 @@ if budget_df is not None and actual_df is not None:
         # TAB 4: Risk Impact Analysis using Matplotlib
         with tab4:
             st.subheader("Risk Impact Analysis")
+            st.markdown("This tab shows the impact of various risk factors as a bar chart.")
             if risk_df is not None and {"Risk Factor", "Variance"}.issubset(risk_df.columns):
                 fig, ax = plt.subplots()
                 ax.bar(risk_df["Risk Factor"], risk_df["Variance"], color="green")
@@ -150,6 +171,7 @@ if budget_df is not None and actual_df is not None:
         # TAB 5: Interactive Quarterly Trend Analysis & Forecast using Plotly with Date Range Filter
         with tab5:
             st.subheader("Quarterly Trend Analysis & Forecast")
+            st.markdown("Explore the quarterly trend of actual expenses and see forecasted values for future periods.")
             if "Date" in actual_df.columns:
                 actual_df["Date"] = pd.to_datetime(actual_df["Date"], errors="coerce")
                 min_date_raw = actual_df["Date"].min()
@@ -194,6 +216,7 @@ if budget_df is not None and actual_df is not None:
         # TAB 6: Generate Reports - Enhanced with Excel Export Option
         with tab6:
             st.subheader("Generate Reports")
+            st.markdown("Generate and download comprehensive reports in PDF, CSV, or Excel format.")
             def generate_pdf_report():
                 pdf = FPDF()
                 pdf.add_page()
@@ -223,7 +246,7 @@ if budget_df is not None and actual_df is not None:
                 output = BytesIO()
                 writer = pd.ExcelWriter(output, engine="openpyxl")
                 df.to_excel(writer, index=False, sheet_name="Sheet1")
-                writer.close()  # Use close() to finish writing
+                writer.close()  # Finish writing
                 processed_data = output.getvalue()
                 return processed_data
             
@@ -238,16 +261,14 @@ if budget_df is not None and actual_df is not None:
             st.subheader("Scenario Analysis: Weighted Actual Costs with Normalized Weights")
             st.markdown(
                 """
-                Assign weights to each cost category. These weights are normalized so that their total is 1.0 (100%), 
-                reflecting the relative importance of each cost component in terms of execution, risk, and financial burden.
+                Assign weights to each cost category and see how the actual spending compares when weighted.
+                The weights are normalized to sum to 1.0.
                 """
             )
-            # Input weights for each cost category
             weights = {}
             for cat in cost_categories:
                 weights[cat] = st.number_input(f"Weight for {cat}", min_value=0.0, value=1.0, step=0.1)
             
-            # Normalize the weights so they sum to 1.0
             total_input_weight = sum(weights.values())
             if total_input_weight == 0:
                 st.error("The sum of weights cannot be zero. Please assign non-zero weights.")
@@ -256,7 +277,6 @@ if budget_df is not None and actual_df is not None:
                 st.markdown("### Normalized Weights")
                 st.write(normalized_weights)
                 
-                # Compute weighted actual cost using normalized weights (Budget remains unchanged)
                 merged_df["Normalized_Weighted_Actual"] = merged_df.apply(
                     lambda row: row["Amount_Actual"] * normalized_weights.get(row["Cost Category"], 0), axis=1
                 )
@@ -270,7 +290,6 @@ if budget_df is not None and actual_df is not None:
                 
                 merged_df["Weighted_CPI"] = merged_df.apply(safe_weighted_cpi, axis=1)
                 
-                # Weighted KPI Summary
                 total_weighted_actual = merged_df["Normalized_Weighted_Actual"].sum()
                 total_weighted_variance = merged_df["Weighted_Variance"].sum()
                 avg_weighted_cpi = merged_df["Weighted_CPI"].mean()
@@ -290,7 +309,80 @@ if budget_df is not None and actual_df is not None:
     else:
         st.warning("The required column 'Cost Category' is missing in the uploaded files.")
 else:
-    st.warning("Please upload both Budgeted and Actual Cost files to proceed.")
+    st.warning("Please upload a Budget file and either an Actual Cost file or enter Actual Expenses in the '📝 Expense Entry' tab to proceed.")
+
+# TAB 8: Expense Entry Form
+with tab8:
+    st.subheader("Enter Actual Expenses")
+    st.markdown(
+        """
+        Use this form to record actual project expenses when an Actual Cost file is not available.
+        The entered expenses will be added to the dashboard analysis.
+        """
+    )
+    with st.form("expense_entry_form", clear_on_submit=True):
+        expense_date = st.date_input("Date of Expense", datetime.date.today())
+        description = st.text_input("Description")
+        amount = st.number_input("Amount (UGX)", min_value=0.0, step=1000.0)
+        category_options = [
+            "Materials", "Labour", "Equipment", "Administrative & Overhead",
+            "Maintenance & Warranty", "Permits & Legal Fees", "Quality Assurance & Testing",
+            "Environmental Fees", "Utilities Relocation", "Contingency",
+            "Insurance & Performance", "Transportation", "Bidding",
+            "Site Preparation & Demobilisation", "Bid Guarantee Fees",
+            "Subcontractor Cost (Meals)", "Other"
+        ]
+        category = st.selectbox("Cost Category", category_options)
+        submitted = st.form_submit_button("Add Expense")
+        if submitted:
+            if description.strip() == "":
+                st.warning("Please enter a valid description.")
+            else:
+                new_row_df = pd.DataFrame([{
+                    "Date": expense_date,
+                    "Description": description,
+                    "Amount": amount,
+                    "Category": category
+                }])
+                st.session_state["expenses_data"] = pd.concat(
+                    [st.session_state["expenses_data"], new_row_df],
+                    ignore_index=True
+                )
+                st.success("Expense added successfully!")
+    st.markdown("### Current Entered Expenses")
+    if not st.session_state["expenses_data"].empty:
+        st.dataframe(st.session_state["expenses_data"], use_container_width=True)
+    else:
+        st.info("No expenses have been recorded yet.")
+
+    def to_csv(df):
+        return df.to_csv(index=False).encode("utf-8")
+
+    def to_excel(df):
+        output = BytesIO()
+        writer = pd.ExcelWriter(output, engine="openpyxl")
+        df.to_excel(writer, index=False, sheet_name="Expenses")
+        writer.close()
+        return output.getvalue()
+
+    if not st.session_state["expenses_data"].empty:
+        col1, col2 = st.columns(2)
+        with col1:
+            csv_data = to_csv(st.session_state["expenses_data"])
+            st.download_button(
+                label="Download CSV",
+                data=csv_data,
+                file_name="actual_expenses_entered.csv",
+                mime="text/csv"
+            )
+        with col2:
+            excel_data = to_excel(st.session_state["expenses_data"])
+            st.download_button(
+                label="Download Excel",
+                data=excel_data,
+                file_name="actual_expenses_entered.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
 # Feedback Section
 st.markdown("## Feedback")
