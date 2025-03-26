@@ -8,7 +8,7 @@ from io import BytesIO
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import datetime
 
-st.title("The Armpass Project Cost Manager")
+st.title("Armpass Project Cost Manager")
 
 # Tabs: Expense Entry first, then the rest
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
@@ -31,11 +31,11 @@ actual_df_uploaded = read_excel(actual_file)
 schedule_df = read_excel(schedule_file)
 risk_df = read_excel(risk_file)
 
-# SESSION STATE for expense entry
+# SESSION STATE for expense entry; initialize if not present
 if "expenses_data" not in st.session_state:
     st.session_state["expenses_data"] = pd.DataFrame(columns=["Date", "Description", "Amount", "Category"])
 
-# If actual file uploaded, use that; else use session state
+# If an actual file is uploaded, use that; otherwise, use the session state data
 if actual_df_uploaded is not None:
     actual_df = actual_df_uploaded
 else:
@@ -83,20 +83,23 @@ with tab1:
             if description.strip() == "":
                 st.warning("Please enter a valid description.")
             else:
-                # Create new row as DataFrame
+                # Ensure existing session data has a unique index
+                if not st.session_state["expenses_data"].index.is_unique:
+                    st.session_state["expenses_data"] = st.session_state["expenses_data"].reset_index(drop=True)
+                # Create new expense row and reset its index
                 new_row_df = pd.DataFrame([{
                     "Date": expense_date,
                     "Description": description,
                     "Amount": amount,
                     "Category": category
-                }])
-                # Reset indexes on both existing data and new row to ensure unique indexing
-                new_row_df.reset_index(drop=True, inplace=True)
+                }]).reset_index(drop=True)
+                # Concatenate with ignore_index to reassign a new unique index
                 st.session_state["expenses_data"] = pd.concat(
-                    [st.session_state["expenses_data"].reset_index(drop=True), new_row_df],
+                    [st.session_state["expenses_data"], new_row_df],
                     ignore_index=True
                 )
                 st.success("Expense added successfully!")
+                
     st.markdown("### Current Entered Expenses")
     if not st.session_state["expenses_data"].empty:
         st.dataframe(st.session_state["expenses_data"], use_container_width=True)
@@ -196,10 +199,13 @@ if budget_df is not None and actual_df is not None:
         with tab4:
             st.subheader("Schedule Performance Index (SPI)")
             if schedule_df is not None and {"Task", "Planned Duration", "Actual Duration"}.issubset(schedule_df.columns):
-                schedule_df["SPI"] = schedule_df["Planned Duration"] / schedule_df["Actual Duration"]
+                # Check for division by zero and set SPI to infinity if Actual Duration is 0
+                schedule_df["SPI"] = schedule_df.apply(
+                    lambda row: row["Planned Duration"] / row["Actual Duration"] if row["Actual Duration"] != 0 else float("inf"),
+                    axis=1
+                )
                 fig, ax = plt.subplots()
                 ax.bar(schedule_df["Task"], schedule_df["SPI"], color="orange")
-                # Set explicit tick positions and labels to avoid warnings
                 ax.set_xticks(range(len(schedule_df["Task"])))
                 ax.set_xticklabels(schedule_df["Task"], rotation=45, ha="right")
                 ax.axhline(1, color="red", linestyle="--", label="Baseline SPI = 1")
@@ -233,14 +239,8 @@ if budget_df is not None and actual_df is not None:
                 actual_df["Date"] = pd.to_datetime(actual_df["Date"], errors="coerce")
                 min_date_raw = actual_df["Date"].min()
                 max_date_raw = actual_df["Date"].max()
-                if pd.isna(min_date_raw):
-                    min_date = datetime.date.today()
-                else:
-                    min_date = min_date_raw.date()
-                if pd.isna(max_date_raw):
-                    max_date = datetime.date.today()
-                else:
-                    max_date = max_date_raw.date()
+                min_date = min_date_raw.date() if pd.notna(min_date_raw) else datetime.date.today()
+                max_date = max_date_raw.date() if pd.notna(max_date_raw) else datetime.date.today()
 
                 date_range = st.date_input("Select Date Range", [min_date, max_date])
                 if len(date_range) == 2:
