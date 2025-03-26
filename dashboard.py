@@ -8,7 +8,7 @@ from io import BytesIO
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import datetime
 
-st.title("Armpass Project Cost Manager")
+st.title("The Armpass Project Cost Manager")
 
 # Tabs: Expense Entry first, then the rest
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
