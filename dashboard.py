@@ -84,25 +84,27 @@ with tab1:
             if description.strip() == "":
                 st.warning("Please enter a valid description.")
             else:
-                # Always reset the index for the current DataFrame
+                # Retrieve current expenses and enforce a fresh unique index
                 current_expenses = st.session_state["expenses_data"].reset_index(drop=True)
-                # Create the new expense row and reset its index
+                # Ensure the DataFrame has the expected columns and order
+                current_expenses = current_expenses[["Date", "Description", "Amount", "Category"]]
+                # Create the new expense row ensuring the same column order and reset index
                 new_row_df = pd.DataFrame([{
                     "Date": expense_date,
                     "Description": description,
                     "Amount": amount,
                     "Category": category
-                }]).reset_index(drop=True)
-                # If current_expenses is empty, assign new_row_df; otherwise, concatenate
-                if current_expenses.empty:
-                    updated_expenses = new_row_df
-                else:
+                }])
+                new_row_df = new_row_df[["Date", "Description", "Amount", "Category"]].reset_index(drop=True)
+                try:
                     updated_expenses = pd.concat(
                         [current_expenses, new_row_df],
                         ignore_index=True
                     )
-                st.session_state["expenses_data"] = updated_expenses
-                st.success("Expense added successfully!")
+                    st.session_state["expenses_data"] = updated_expenses
+                    st.success("Expense added successfully!")
+                except Exception as e:
+                    st.error(f"Error concatenating expense data: {e}")
                 
     st.markdown("### Current Entered Expenses")
     if not st.session_state["expenses_data"].empty:
