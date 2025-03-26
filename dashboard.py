@@ -8,7 +8,7 @@ from io import BytesIO
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import datetime
 
-st.title("The Armpass Project Cost Manager")
+st.title("Armpass Project Cost Manager")
 
 # Tabs: Expense Entry first, then the rest
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
@@ -84,11 +84,8 @@ with tab1:
             if description.strip() == "":
                 st.warning("Please enter a valid description.")
             else:
-                # Retrieve current expenses data from session state
-                current_expenses = st.session_state["expenses_data"]
-                # Ensure the index is unique by resetting if needed
-                if not current_expenses.index.is_unique:
-                    current_expenses = current_expenses.reset_index(drop=True)
+                # Always reset the index for the current DataFrame
+                current_expenses = st.session_state["expenses_data"].reset_index(drop=True)
                 # Create the new expense row and reset its index
                 new_row_df = pd.DataFrame([{
                     "Date": expense_date,
@@ -96,11 +93,14 @@ with tab1:
                     "Amount": amount,
                     "Category": category
                 }]).reset_index(drop=True)
-                # Concatenate with ignore_index=True to assign a new unique index
-                updated_expenses = pd.concat(
-                    [current_expenses, new_row_df],
-                    ignore_index=True
-                )
+                # If current_expenses is empty, assign new_row_df; otherwise, concatenate
+                if current_expenses.empty:
+                    updated_expenses = new_row_df
+                else:
+                    updated_expenses = pd.concat(
+                        [current_expenses, new_row_df],
+                        ignore_index=True
+                    )
                 st.session_state["expenses_data"] = updated_expenses
                 st.success("Expense added successfully!")
                 
@@ -110,7 +110,8 @@ with tab1:
     else:
         st.info("No expenses have been recorded yet.")
 
-    # Function to prepare the export DataFrame with exactly four columns
+    # Prepare the export DataFrame with exactly four columns:
+    # Date, Description, Amount_Actual, Cost Category
     def get_expenses_export_df():
         df = st.session_state["expenses_data"]
         # Rename columns: "Amount" becomes "Amount_Actual" and "Category" becomes "Cost Category"
